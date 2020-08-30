@@ -1,1 +1,1 @@
-# Yeetus-Discord-bot
+# Yeetus-Discord-Bot
