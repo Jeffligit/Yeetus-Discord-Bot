@@ -1,5 +1,5 @@
 # bot.py
-import os, os, pymongo, discord, random
+import os, os, pymongo, discord, random, datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,12 +31,18 @@ async def on_message(message):
         userData.update_one({'id' : user.id}, {'$inc' : {'points' : gained_points, 'experience': 1}})
 
 
-    # mention
+    # mentions bot
     if client.user.mentioned_in(message) :
-        await channel.send(mention(user) + ' please don\'t @ me. Try `!yeet` to see what you can do with me.')
+        if message.content == '@everyone' :
+            return
+        else:
+            try:
+                await channel.send(mention(user) + ' please don\'t @ me. Try `!yeet` to see what you can do with me.')
+            except:
+                return
 
     if message.content.startswith('!yeet '):
-        print('command?')
+        await parse_command(message)
 
     elif message.content == '!yeet':
         #send instructions
@@ -62,16 +68,12 @@ async def on_member_join(user):
         userData.update_one({'id' : user.id}, {'$inc' : {'experience': -1}})
 
 def add_new_user_to_db(user):
-    userData.insert_one({'id': user.id, 'experience': 0, 'level': 1, 'points': 0})
+    userData.insert_one({'id': user.id, 'experience': 0, 'level': 1, 'points': 0, 'last claim': None})
 
 async def check_for_level_up(user, channel):
     user_document = userData.find_one({'id' : user.id})
     user_level = user_document.get('level')
     user_experience = user_document.get('experience')
-    
-
-
-
     if (levels.find_one({'level' : user_level}).get('max experience') <= user_experience) :
         new_level = user_level + 1
         userData.update_one({'id' : user.id}, {'$set' : {'experience' : 0, 'level' : new_level}})
@@ -112,5 +114,41 @@ async def send_instruction(user, page):
     )
     await user.create_dm()
     await user.dm_channel.send(embed=instruction)
+
+
+async def parse_command(message):
+    channel = message.channel
+    entire_message = message.content.split()
+    command = entire_message[1]
+    if command == 'claim' :
+        print('claim')
+        user = message.author
+        last_claim = userData.find_one({'id' : user.id}).get('last claim')
+        if (last_claim == None or datetime.datetime.now() - last_claim >= datetime.timedelta(seconds=79200)) :
+            userData.update_one({'id' : user.id}, {'$inc' : {'points' : 200}, '$set' : {'last claim' : datetime.datetime.now()}})
+            await channel.send('Here are your daily **200** points.')
+        else:
+            try:
+                next_claim_time = str(datetime.timedelta(seconds=79200) - (datetime.datetime.now() - last_claim)).split(':')
+                await channel.send(':x: You already claimed your daily points within the last 22 hours. \n Try again in **{} hours** and **{} minutes**.'.format(next_claim_time[0], next_claim_time[1]))
+            except:
+                return
+
+    elif command == 'about' :
+        print('about')
+    elif command == 'gamble' :
+        print('gamble')
+    else: 
+        try:
+            error = discord.Embed(
+                title = ':x: Unkown Command :x:',
+                color = discord.Colour.red(),
+                description = 'Try `!yeet` to see what I can do.',
+            )
+            await channel.send(embed=error)
+        except:
+            pass
+
+    
 
 client.run(TOKEN)
